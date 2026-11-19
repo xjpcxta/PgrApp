@@ -1,7 +1,7 @@
-import type { Questao } from './tipos';
+import type { Questao } from '../tipos';
 
 /**
- * Provinha Leve — 10 questões com 4 opções cada.
+ * Provinha Tensa 4 — 5 questões com 4 opções cada.
  *
  * Formato de cada questão:
  * {
@@ -12,4 +12,4 @@ import type { Questao } from './tipos';
  *   explicacao: 'A certa é a B porque...',
  * },
  */
-export const questoesLeve: Questao[] = [];
+export const questoesTensa4: Questao[] = [];

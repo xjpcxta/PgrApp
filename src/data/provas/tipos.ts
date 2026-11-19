@@ -15,13 +15,25 @@ export type Questao = {
 
 export type NivelProva = 'leve' | 'quase-tranquila' | 'tensa';
 
+/** Cada nível tem quatro provas diferentes, de 5 questões cada. */
+export type VarianteId = '1' | '2' | '3' | '4';
+
+export type VarianteProva = {
+  id: VarianteId;
+  /** O que essa prova fala das outras no momento da escolha (cada uma responde a anterior). */
+  provocacao: string;
+  questoes: Questao[];
+};
+
 export type Prova = {
   nivel: NivelProva;
   titulo: string;
   /** Frase curta que aparece no card do menu. */
   descricao: string;
+  /** O que o professor fala na tela de escolha entre as duas provas. */
+  falaEscolha: string;
   emoji: string;
   cor: string;
   corSombra: string;
-  questoes: Questao[];
+  variantes: [VarianteProva, VarianteProva, VarianteProva, VarianteProva];
 };

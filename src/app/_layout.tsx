@@ -33,8 +33,10 @@ function Navegacao() {
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: Colors.background } }}>
       <Stack.Screen name="index" />
       <Stack.Screen name="boas-vindas" options={{ animation: 'fade' }} />
-      <Stack.Screen name="prova/[nivel]" options={{ gestureEnabled: false }} />
+      <Stack.Screen name="prova/[nivel]/index" />
+      <Stack.Screen name="prova/[nivel]/[variante]" options={{ gestureEnabled: false }} />
       <Stack.Screen name="duvida" />
+      <Stack.Screen name="desafio" />
     </Stack>
   );
 }

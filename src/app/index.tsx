@@ -2,6 +2,7 @@ import { Redirect, router } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { BotaoDesafio } from '@/components/botao-desafio';
 import { FundoCodigo } from '@/components/fundo-codigo';
 import { Professor } from '@/components/professor';
 import { Colors, Fonts, MaxContentWidth, Radius, Spacing } from '@/constants/theme';
@@ -86,6 +87,8 @@ export default function MenuScreen() {
               corSombra={Colors.purpleDark}
               onPress={() => router.push('/duvida')}
             />
+
+            <BotaoDesafio onPress={() => router.push('/desafio')} />
           </View>
 
           <Pressable onPress={esquecerNome} hitSlop={8} style={styles.trocarNome}>

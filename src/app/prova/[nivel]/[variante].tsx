@@ -1,6 +1,14 @@
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
-import { useState, type ReactNode } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useRef, useState, type ComponentRef, type ReactNode } from 'react';
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+  type ScrollViewInstance,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Botao } from '@/components/botao';
@@ -9,9 +17,20 @@ import { OpcaoResposta, type EstadoOpcao } from '@/components/opcao-resposta';
 import { Professor } from '@/components/professor';
 import { Colors, Fonts, MaxContentWidth, Radius, Spacing } from '@/constants/theme';
 import { useAluno } from '@/context/aluno-context';
-import { ehNivelValido, PROVAS, type Prova, type Questao } from '@/data/provas';
+import {
+  buscarVariante,
+  ehNivelValido,
+  PROVAS,
+  proximaVariante,
+  type Prova,
+  type Questao,
+  type VarianteProva,
+} from '@/data/provas';
 
 const LETRAS = ['A', 'B', 'C', 'D'] as const;
+
+/** Enunciados maiores que isso usam uma fonte menor pra caber melhor no celular. */
+const PERGUNTA_LONGA = 140;
 
 function estadoDaOpcao(indice: number, questao: Questao, selecionada: number | null): EstadoOpcao {
   if (selecionada === null) return 'livre';
@@ -29,31 +48,66 @@ function falaDoResultado(nome: string, acertos: number, total: number) {
 }
 
 export default function ProvaScreen() {
-  const { nivel } = useLocalSearchParams<{ nivel: string }>();
+  const { nivel, variante } = useLocalSearchParams<{ nivel: string; variante: string }>();
 
   if (!ehNivelValido(nivel)) return <Redirect href="/" />;
 
-  return <ProvaEmAndamento key={nivel} prova={PROVAS[nivel]} />;
+  const prova = PROVAS[nivel];
+  const escolhida = buscarVariante(prova, variante);
+
+  if (!escolhida) return <Redirect href={{ pathname: '/prova/[nivel]', params: { nivel } }} />;
+
+  return <ProvaEmAndamento key={`${nivel}-${escolhida.id}`} prova={prova} variante={escolhida} />;
 }
 
-function ProvaEmAndamento({ prova }: { prova: Prova }) {
+function ProvaEmAndamento({ prova, variante }: { prova: Prova; variante: VarianteProva }) {
   const { nome } = useAluno();
   const aluno = nome ?? 'aluno';
-  const total = prova.questoes.length;
+  const titulo = `${prova.titulo} ${variante.id}`;
+  const questoes = variante.questoes;
+  const total = questoes.length;
+  const proxima = proximaVariante(prova, variante);
+
+  function irParaProxima() {
+    if (!proxima) return;
+    router.replace({
+      pathname: '/prova/[nivel]/[variante]',
+      params: { nivel: prova.nivel, variante: proxima.id },
+    });
+  }
 
   const [indice, setIndice] = useState(0);
   const [selecionada, setSelecionada] = useState<number | null>(null);
   const [acertos, setAcertos] = useState(0);
   const [terminou, setTerminou] = useState(false);
 
+  const { height: altura } = useWindowDimensions();
+  const rolagemRef = useRef<ScrollViewInstance>(null);
+  const conteudoRef = useRef<ComponentRef<typeof View>>(null);
+  const opcaoRefs = useRef<(ComponentRef<typeof View> | null)[]>([]);
+
+  // Quando o aluno erra, rolo a tela até a opção certa pra ele ver o que marquei em verde.
+  const questaoAtual = variante.questoes[indice];
+  useEffect(() => {
+    if (selecionada === null || !questaoAtual || selecionada === questaoAtual.correta) return;
+    const opcao = opcaoRefs.current[questaoAtual.correta];
+    const conteudo = conteudoRef.current;
+    if (!opcao || !conteudo) return;
+    opcao.measureLayout(
+      conteudo,
+      (_x, y) => rolagemRef.current?.scrollTo({ y: Math.max(0, y - Spacing.md), animated: true }),
+      () => {},
+    );
+  }, [selecionada, questaoAtual]);
+
   if (total === 0) {
     return (
       <TelaCentral>
         <Professor
           tamanho="grande"
-          fala={`Opa, ${aluno}! A ${prova.titulo} eu ainda tô montando. Volta daqui a pouco que ela vai estar prontinha.`}
+          fala={`Opa, ${aluno}! A ${titulo} eu ainda tô montando. Volta daqui a pouco que ela vai estar prontinha.`}
         />
-        <Botao titulo="Voltar pro menu" onPress={() => router.back()} />
+        <Botao titulo="Voltar" onPress={() => router.back()} />
       </TelaCentral>
     );
   }
@@ -67,7 +121,7 @@ function ProvaEmAndamento({ prova }: { prova: Prova }) {
             {acertos}
             <Text style={styles.placarTotal}>/{total}</Text>
           </Text>
-          <Text style={styles.placarLegenda}>acertos na {prova.titulo}</Text>
+          <Text style={styles.placarLegenda}>acertos na {titulo}</Text>
         </View>
         <View style={styles.botoesResultado}>
           <Botao
@@ -81,19 +135,28 @@ function ProvaEmAndamento({ prova }: { prova: Prova }) {
               setTerminou(false);
             }}
           />
+          {proxima ? (
+            <Botao
+              titulo={`Encarar a ${prova.titulo} ${proxima.id}`}
+              cor={Colors.surfaceRaised}
+              corSombra={Colors.border}
+              corTexto={Colors.text}
+              onPress={irParaProxima}
+            />
+          ) : null}
           <Botao
             titulo="Voltar pro menu"
             cor={Colors.surfaceRaised}
             corSombra={Colors.border}
             corTexto={Colors.text}
-            onPress={() => router.back()}
+            onPress={() => router.dismissAll()}
           />
         </View>
       </TelaCentral>
     );
   }
 
-  const questao = prova.questoes[indice];
+  const questao = questoes[indice];
   const respondeu = selecionada !== null;
   const acertou = selecionada === questao.correta;
   const ultima = indice === total - 1;
@@ -112,6 +175,7 @@ function ProvaEmAndamento({ prova }: { prova: Prova }) {
     }
     setIndice((i) => i + 1);
     setSelecionada(null);
+    rolagemRef.current?.scrollTo({ y: 0, animated: false });
   }
 
   return (
@@ -134,11 +198,18 @@ function ProvaEmAndamento({ prova }: { prova: Prova }) {
             </View>
           </View>
 
-          <ScrollView contentContainerStyle={styles.conteudo}>
+          <ScrollView ref={rolagemRef}>
+            <View ref={conteudoRef} style={styles.conteudo}>
             <Text style={styles.contador}>
               {prova.emoji} Questão {indice + 1} de {total}
             </Text>
-            <Text style={styles.pergunta}>{questao.pergunta}</Text>
+            <Text
+              style={[
+                styles.pergunta,
+                questao.pergunta.length > PERGUNTA_LONGA && styles.perguntaLonga,
+              ]}>
+              {questao.pergunta}
+            </Text>
 
             {questao.codigo ? (
               <View style={styles.codigo}>
@@ -148,14 +219,20 @@ function ProvaEmAndamento({ prova }: { prova: Prova }) {
 
             <View style={styles.opcoes}>
               {questao.opcoes.map((texto, i) => (
-                <OpcaoResposta
+                <View
                   key={i}
-                  letra={LETRAS[i]}
-                  texto={texto}
-                  estado={estadoDaOpcao(i, questao, selecionada)}
-                  onPress={() => responder(i)}
-                />
+                  ref={(el) => {
+                    opcaoRefs.current[i] = el;
+                  }}>
+                  <OpcaoResposta
+                    letra={LETRAS[i]}
+                    texto={texto}
+                    estado={estadoDaOpcao(i, questao, selecionada)}
+                    onPress={() => responder(i)}
+                  />
+                </View>
               ))}
+            </View>
             </View>
           </ScrollView>
 
@@ -165,19 +242,21 @@ function ProvaEmAndamento({ prova }: { prova: Prova }) {
               respondeu && { backgroundColor: acertou ? Colors.successBg : Colors.errorBg },
             ]}>
             {respondeu ? (
-              <View style={styles.feedback}>
+              <ScrollView
+                style={{ maxHeight: altura * 0.3 }}
+                contentContainerStyle={styles.feedback}>
                 <Text style={[styles.feedbackTitulo, { color: acertou ? Colors.success : Colors.error }]}>
                   {acertou ? 'Mandou bem!' : 'Não foi dessa vez...'}
                 </Text>
                 {!acertou ? (
                   <>
                     <Text style={styles.feedbackCerta}>
-                      A certa é a letra {LETRAS[questao.correta]}: {questao.opcoes[questao.correta]}
+                      A certa é a letra {LETRAS[questao.correta]}, que eu marquei em verde ali em cima.
                     </Text>
                     <Text style={styles.feedbackExplicacao}>{questao.explicacao}</Text>
                   </>
                 ) : null}
-              </View>
+              </ScrollView>
             ) : (
               <Text style={styles.dica}>Toca na resposta que você acha que é a certa.</Text>
             )}
@@ -270,6 +349,10 @@ const styles = StyleSheet.create({
     fontSize: 22,
     lineHeight: 30,
     fontWeight: '800',
+  },
+  perguntaLonga: {
+    fontSize: 18,
+    lineHeight: 25,
   },
   codigo: {
     backgroundColor: '#070B16',
