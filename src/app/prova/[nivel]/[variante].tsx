@@ -26,6 +26,7 @@ import {
   type Questao,
   type VarianteProva,
 } from '@/data/provas';
+import { montarTentativa } from '@/utils/embaralhar';
 
 const LETRAS = ['A', 'B', 'C', 'D'] as const;
 
@@ -64,8 +65,7 @@ function ProvaEmAndamento({ prova, variante }: { prova: Prova; variante: Variant
   const { nome } = useAluno();
   const aluno = nome ?? 'aluno';
   const titulo = `${prova.titulo} ${variante.id}`;
-  const questoes = variante.questoes;
-  const total = questoes.length;
+  const total = variante.questoes.length;
   const proxima = proximaVariante(prova, variante);
 
   function irParaProxima() {
@@ -76,6 +76,8 @@ function ProvaEmAndamento({ prova, variante }: { prova: Prova; variante: Variant
     });
   }
 
+  // Cada tentativa embaralha a ordem das questões e das opções, pra não criar padrão no gabarito.
+  const [questoes, setQuestoes] = useState(() => montarTentativa(variante.questoes));
   const [indice, setIndice] = useState(0);
   const [selecionada, setSelecionada] = useState<number | null>(null);
   const [acertos, setAcertos] = useState(0);
@@ -87,7 +89,7 @@ function ProvaEmAndamento({ prova, variante }: { prova: Prova; variante: Variant
   const opcaoRefs = useRef<(ComponentRef<typeof View> | null)[]>([]);
 
   // Quando o aluno erra, rolo a tela até a opção certa pra ele ver o que marquei em verde.
-  const questaoAtual = variante.questoes[indice];
+  const questaoAtual = questoes[indice];
   useEffect(() => {
     if (selecionada === null || !questaoAtual || selecionada === questaoAtual.correta) return;
     const opcao = opcaoRefs.current[questaoAtual.correta];
@@ -129,6 +131,7 @@ function ProvaEmAndamento({ prova, variante }: { prova: Prova; variante: Variant
             cor={prova.cor}
             corSombra={prova.corSombra}
             onPress={() => {
+              setQuestoes(montarTentativa(variante.questoes));
               setIndice(0);
               setSelecionada(null);
               setAcertos(0);
